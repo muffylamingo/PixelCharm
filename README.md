@@ -16,12 +16,16 @@ A tiny ESP32-S3 keychain with a 1.54" colour screen. Pick a theme in the phone a
 
 | Phase | Goal | Status |
 |---|---|---|
-| 0 | Setup | 🚧 |
+| 0 | Setup | ✅ |
 | 1 | Images, animations and a d20 on the device | ⬜ |
 | 2 | Phone ↔ device over BLE | ⬜ |
 | 3 | Upload your own photos | ⬜ |
 | 4 | Battery, sleep and case: a real keychain | ⬜ |
 | 5 | Docs and release | ⬜ |
+
+## Try it in the simulator
+
+The current firmware runs in your browser on [Wokwi](https://wokwi.com/projects/478950439863111681): an ESP32-S3 blinking an LED, with a button that keeps it on.
 
 ## Repository layout
 
