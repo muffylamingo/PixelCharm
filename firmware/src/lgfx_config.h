@@ -41,7 +41,9 @@ class LGFX : public lgfx::LGFX_Device {
     busCfg.spi_host = SPI2_HOST;
     busCfg.spi_mode = 0;
     busCfg.freq_write = 40000000;  // 40 MHz
-    busCfg.dma_channel = SPI_DMA_CH_AUTO;
+    // No DMA in Wokwi: a full-screen sprite sent with DMA came out as stripes there, without DMA it was correct.
+    // The real board (task 1.7) will try SPI_DMA_CH_AUTO, which frees the CPU while pixels are sent.
+    busCfg.dma_channel = 0;
     busCfg.pin_sclk = PIN_SCK;
     busCfg.pin_mosi = PIN_MOSI;
     busCfg.pin_miso = -1;  // we never read from the display
