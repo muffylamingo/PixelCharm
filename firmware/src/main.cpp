@@ -1,4 +1,5 @@
 // Tasks 1.1-1.3: colour display demo, two debounced buttons and the basic face.
+// Runs in Wokwi and, since task 1.7, on the real board (platformio.ini picks the display).
 #include <Arduino.h>
 
 #include "button.h"
@@ -27,9 +28,13 @@ float ballSpeedX = 90, ballSpeedY = 70;  // pixels per second
 constexpr uint16_t BALL_COLORS[] = {TFT_ORANGE, TFT_CYAN, TFT_MAGENTA, TFT_GREENYELLOW};
 int ballColor = 0;
 
-// The real backlight is wired up in task 1.7. Until then the level is only shown on screen.
+// Backlight levels in percent. The real screen dims; Wokwi's backlight is wired to 3V3, so there it is only a number.
 constexpr int BRIGHTNESS_LEVELS[] = {25, 50, 75, 100};
 int brightness = 3;
+
+void applyBrightness() {
+  display.setBrightness(BRIGHTNESS_LEVELS[brightness] * 255 / 100);  // LovyanGFX takes 0-255
+}
 
 struct PressCounts {
   int shortPresses = 0;
@@ -160,6 +165,7 @@ void handleButtons(uint32_t now) {
     } else {
       countsA.longPresses++;
       brightness = (brightness + 1) % 4;
+      applyBrightness();
     }
   }
 
@@ -193,14 +199,21 @@ void setup() {
   Serial.begin(115200);
   buttonA.begin();
   buttonB.begin();
+  // Tells us which board we are on: the real N16R8 board should say 16 MB flash and 8 MB PSRAM
+  Serial.printf("Kart: %s, flash %lu MB, PSRAM %lu MB\n", ESP.getChipModel(), (unsigned long)(ESP.getFlashChipSize() >> 20),
+                (unsigned long)(ESP.getPsramSize() >> 20));
+
   display.init();
   display.fillScreen(TFT_BLACK);
+  applyBrightness();
 
-  // Only exists in Wokwi: shade the rows our real 240x240 screen does not have
-  display.fillRect(0, SCREEN_SIZE, display.width(), display.height() - SCREEN_SIZE, TFT_DARKGREY);
-  display.setTextColor(TFT_LIGHTGREY, TFT_DARKGREY);
-  display.setTextSize(1);
-  display.drawString("Wokwi only: outside the 240x240 area", 8, SCREEN_SIZE + 8);
+  // Only Wokwi's 240x320 display has rows below our 240x240 area: shade them
+  if (display.height() > SCREEN_SIZE) {
+    display.fillRect(0, SCREEN_SIZE, display.width(), display.height() - SCREEN_SIZE, TFT_DARKGREY);
+    display.setTextColor(TFT_LIGHTGREY, TFT_DARKGREY);
+    display.setTextSize(1);
+    display.drawString("Wokwi only: outside the 240x240 area", 8, SCREEN_SIZE + 8);
+  }
 
   // 240 x 240 pixels x 2 bytes = 115,200 bytes of RAM
   canvas.setColorDepth(16);
