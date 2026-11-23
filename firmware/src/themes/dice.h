@@ -1,9 +1,8 @@
 // The d20 theme: a twenty-sided die you roll with B. A natural 20 turns gold, a natural 1 turns red.
 #pragma once
-#include <Arduino.h>
 #include <esp_random.h>
-#define LGFX_USE_V1
-#include <LovyanGFX.hpp>
+
+#include "theme.h"
 
 // A fair roll from 1 to `sides`, using the chip's hardware random number generator.
 // esp_random() gives one of 2^32 numbers. 2^32 is not a multiple of 20, so "esp_random() % 20" would make
@@ -40,8 +39,35 @@ inline void printFairnessTest(Print& out, uint32_t rolls) {
              (unsigned long)elapsedUs, chiSquare);
 }
 
-class Dice {
+class Dice : public Theme {
  public:
+  String id() const override { return "dice"; }
+  String name() const override { return "d20"; }
+  void frame(LGFX_Sprite& canvas, uint32_t now, float) override {
+    update(now);
+    draw(canvas);
+  }
+  void action(uint32_t now) override { roll(now); }
+
+  // The menu's icon: the outline and the front triangle, with a 20 on it
+  void drawIcon(LGFX_Sprite& canvas, int x, int y, int size) const override {
+    canvas.fillRect(x, y, size, size, TFT_BLACK);
+    float centerX = x + size / 2.0f, centerY = y + size / 2.0f;
+    float outer = size * 0.47f, inner = outer * INNER_RADIUS / OUTER_RADIUS;
+    float px[9], py[9];
+    for (int i = 0; i < 6; i++) iconPoint(centerX, centerY, -90 + 60 * i, outer, px[i], py[i]);
+    for (int i = 0; i < 3; i++) iconPoint(centerX, centerY, -90 + 120 * i, inner, px[6 + i], py[6 + i]);
+    for (int i = 0; i < 6; i++) canvas.fillTriangle(centerX, centerY, px[i], py[i], px[(i + 1) % 6], py[(i + 1) % 6], shade(PURPLE, 0.55f));
+    canvas.fillTriangle(px[6], py[6], px[7], py[7], px[8], py[8], shade(PURPLE, 1));
+    canvas.setFont(&fonts::Font2);
+    canvas.setTextSize(1);
+    canvas.setTextDatum(textdatum_t::middle_center);
+    canvas.setTextColor(TFT_WHITE);
+    canvas.drawString("20", centerX, centerY + 3);
+    canvas.setFont(&fonts::Font0);
+    canvas.setTextDatum(textdatum_t::top_left);
+  }
+
   // B short press: roll. Presses during a roll are ignored, so one roll can't start on top of another.
   void roll(uint32_t now) {
     if (phase_ == Phase::Rolling) return;
@@ -161,6 +187,11 @@ class Dice {
 
   static uint16_t shade(const Rgb& color, float brightness) {
     return lgfx::color565(uint8_t(color.r * brightness), uint8_t(color.g * brightness), uint8_t(color.b * brightness));
+  }
+
+  static void iconPoint(float centerX, float centerY, float degrees, float radius, float& px, float& py) {
+    px = centerX + cosf(degrees * DEG_TO_RAD) * radius;
+    py = centerY + sinf(degrees * DEG_TO_RAD) * radius;
   }
 
   // A point `radius` pixels away from the die's centre, in the direction `degrees` (0 = right, 90 = down)

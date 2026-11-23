@@ -1,11 +1,30 @@
 // The basic face theme: two eyes that blink and look around, and a happy face when you press B.
+// Drawn with code, so it is always there, even with an empty disk.
 #pragma once
-#include <Arduino.h>
-#define LGFX_USE_V1
-#include <LovyanGFX.hpp>
+#include "theme.h"
 
-class Face {
+class Face : public Theme {
  public:
+  String id() const override { return "face"; }
+  String name() const override { return "Yuz"; }
+  void frame(LGFX_Sprite& canvas, uint32_t now, float seconds) override {
+    update(now, seconds);
+    draw(canvas);
+  }
+  void action(uint32_t now) override { react(now); }
+
+  // The menu's icon: the same face, small and still
+  void drawIcon(LGFX_Sprite& canvas, int x, int y, int size) const override {
+    canvas.fillRect(x, y, size, size, BACKGROUND);
+    int centerX = x + size / 2, eyeY = y + size * 42 / 100;
+    int eyeWidth = size * 22 / 100, eyeHeight = size * 30 / 100, gap = size * 21 / 100;
+    for (int side : {-1, 1}) {
+      canvas.fillSmoothRoundRect(centerX + side * gap - eyeWidth / 2, eyeY - eyeHeight / 2, eyeWidth, eyeHeight, eyeWidth / 3,
+                                 EYE_COLOR);
+    }
+    canvas.fillArc(centerX, y + size * 64 / 100, size * 8 / 100, size * 12 / 100, 30, 150, EYE_COLOR);
+  }
+
   // Call once per frame before draw(). Works out where the eyes are and how open they are.
   void update(uint32_t now, float seconds) {
     updateBlink(now);

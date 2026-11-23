@@ -6,12 +6,14 @@
 Each picture is cut to a square (portrait pictures keep their upper part, where faces usually are) and
 shrunk to 240x240. Still pictures become baseline JPEGs, the kind the board's decoder can read.
 Animated GIFs stay GIFs: every frame is cut and shrunk the same way, and keeps its timing.
+Each one also gets a 64x64 thumbnail for the menu, and index.json lists them all with a short name.
 Then "Upload Filesystem Image" in PlatformIO copies firmware/data/ onto the board.
 
 Needs Pillow: pip install pillow
 Pictures you don't own (anime art...) belong in themes-private/, which git ignores. Never commit them.
 """
 import argparse
+import json
 import re
 import unicodedata
 from pathlib import Path
@@ -24,6 +26,10 @@ EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"}
 PORTRAIT_FOCUS = 0.3
 # Browsers show GIF frames shorter than this at 100 ms, so we do the same
 MIN_FRAME_MS = 20
+# The menu's small pictures (firmware/src/app/menu.h draws them in a 3x3 grid)
+THUMB_SIZE = 64
+MAX_NAME = 16
+NOT_A_NAME = {"pfp", "pp", "icon", "gif", "wallpaper"}
 
 
 def square_crop(image):
@@ -50,13 +56,28 @@ def fit(image):
     return square_crop(to_rgb(image)).resize((SIZE, SIZE), Image.LANCZOS)
 
 
+def ascii_text(text):
+    """The board's fonts only have plain ASCII letters: ç -> c, ö -> o, ı -> i..."""
+    # Turkish ı and İ don't break down into an ASCII letter plus a mark like ç or ö do, so map them first
+    text = text.translate(str.maketrans({"ı": "i", "İ": "I"}))
+    return unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
+
+
 def short_name(path, number, extension):
     """01_name.jpg: the number keeps the order on the board, the name stays ASCII and short."""
-    # Turkish ı and İ don't break down into an ASCII letter plus a mark like ç or ö do, so map them first
-    stem = path.stem.translate(str.maketrans({"ı": "i", "İ": "I"}))
-    ascii_name = unicodedata.normalize("NFKD", stem).encode("ascii", "ignore").decode()
-    slug = re.sub(r"[^a-z0-9]+", "_", ascii_name.lower()).strip("_")[:20] or "picture"
+    slug = re.sub(r"[^a-z0-9]+", "_", ascii_text(path.stem).lower()).strip("_")[:20] or "picture"
     return f"{number:02d}_{slug}{extension}"
+
+
+def display_name(path):
+    """The name the menu shows: "luffy pfp.jpg" -> "Luffy". Words that only say what kind of file it is go."""
+    words = re.split(r"[\s_\-]+", ascii_text(path.stem))
+    words = [w for w in words if w and w.lower() not in NOT_A_NAME]
+    return " ".join(w.capitalize() for w in words)[:MAX_NAME] or "Resim"
+
+
+def save_thumbnail(image, target):
+    image.resize((THUMB_SIZE, THUMB_SIZE), Image.LANCZOS).save(target, "JPEG", quality=85, subsampling=0, progressive=False)
 
 
 def save_jpeg(path, number, output):
@@ -95,18 +116,35 @@ def main():
     pictures = sorted(p for p in args.source.iterdir() if p.suffix.lower() in EXTENSIONS)
     if not pictures:
         raise SystemExit(f"no pictures in {args.source}")
-    args.output.mkdir(parents=True, exist_ok=True)
-    for old in [*args.output.glob("*.jpg"), *args.output.glob("*.gif")]:
-        old.unlink()  # the folder mirrors the source: a picture you removed disappears from the board too
+    thumbs = args.output / "thumbs"
+    thumbs.mkdir(parents=True, exist_ok=True)
+    # The folder mirrors the source: a picture you removed disappears from the board too
+    for old in [*args.output.glob("*.jpg"), *args.output.glob("*.gif"), *thumbs.glob("*.jpg")]:
+        old.unlink()
 
-    results = []
+    results, index = [], []
     for number, path in enumerate(pictures, start=1):
         with Image.open(path) as probe:
             animated = getattr(probe, "n_frames", 1) > 1
             size = probe.size
         target, first_frame = (save_gif if animated else save_jpeg)(path, number, args.output)
-        print(f"{path.name} ({size[0]}x{size[1]}) -> {target.name}, {target.stat().st_size / 1024:.1f} KB")
+        thumb = thumbs / (target.stem + ".jpg")
+        save_thumbnail(first_frame, thumb)
+        name = display_name(path)
+        print(f"{path.name} ({size[0]}x{size[1]}) -> {target.name}, {target.stat().st_size / 1024:.1f} KB, \"{name}\"")
         results.append(first_frame)
+        # Paths as the board sees them: firmware/data/ is the root of its LittleFS disk
+        index.append({
+            "name": name,
+            "type": "gif" if animated else "image",
+            "file": f"/{args.output.name}/{target.name}",
+            "thumb": f"/{args.output.name}/thumbs/{thumb.name}",
+        })
+
+    # The list of picture themes, in order. The face and the d20 are built in and not listed here.
+    # In Faz 2 the phone app will write this file.
+    (args.output / "index.json").write_text(json.dumps({"version": 1, "themes": index}, indent=2), encoding="utf-8")
+    print(f"index.json: {len(index)} themes")
 
     if args.preview:
         sheet = Image.new("RGB", (len(results) * (SIZE + 10) - 10, SIZE), (40, 40, 40))

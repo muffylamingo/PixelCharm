@@ -4,14 +4,7 @@
 #define LGFX_USE_V1
 #include <LovyanGFX.hpp>
 
-// Pin plan from PLAN.md: the same pins are used in Wokwi and on the real board.
-// They all sit on the board's left pin row, so one side of the breadboard is enough.
-constexpr int PIN_SCK = 12;
-constexpr int PIN_MOSI = 11;
-constexpr int PIN_CS = 10;  // only Wokwi's display has a CS pin; the real 1.3" screen has none
-constexpr int PIN_DC = 9;
-constexpr int PIN_RST = 14;
-constexpr int PIN_BACKLIGHT = 13;  // only on the real screen; Wokwi's backlight is wired to 3V3
+#include "../board_devkit.h"  // the pins
 
 // platformio.ini picks the panel with a build flag. The Wokwi website has no build flags, so ILI9341 is the default.
 #if !defined(PANEL_ILI9341) && !defined(PANEL_ST7789)
