@@ -338,11 +338,13 @@ void loop() {
       dice.draw(canvas);
       break;
     case Screen::Image:
-      // A picture doesn't change: decode it only when a different one comes on screen
+      // A JPEG doesn't change: decode it only when a different picture comes on screen.
+      // A GIF moves on to its next frame inside update() when that frame is due.
       if (loadedImage != (int)imageIndex) {
-        gallery.draw(canvas, imageIndex);
+        gallery.show(canvas, imageIndex);
         loadedImage = imageIndex;
       }
+      gallery.update(canvas, now);
       break;
     case Screen::Demo:
       moveBall(seconds);
@@ -353,7 +355,10 @@ void loop() {
       break;
   }
   // Every other screen draws over the canvas, so a picture has to be decoded again next time
-  if (currentScreen != Screen::Image) loadedImage = -1;
+  if (currentScreen != Screen::Image) {
+    loadedImage = -1;
+    gallery.stop();  // frees a GIF's memory; does nothing otherwise
+  }
   // ...then send the finished frame to the display in one go
   canvas.pushSprite(0, 0);
   updateFps(now);
