@@ -11,8 +11,14 @@ LGFX display;
 // An invisible 240x240 drawing board in RAM. Each frame is drawn here first and then sent to
 // the display in one go, so the display never shows a half-drawn frame (no flicker).
 LGFX_Sprite canvas(&display);
-Button buttonA(4);  // pin plan: button A on GPIO 4
-Button buttonB(5);  // pin plan: button B on GPIO 5
+#ifdef BUTTONS_TOUCH
+// Real board for now: no push buttons yet, so you touch the bare tip of the wire on GPIO 4 or 5 with a finger
+constexpr ButtonInput BUTTON_INPUT = ButtonInput::Touch;
+#else
+constexpr ButtonInput BUTTON_INPUT = ButtonInput::PullUp;  // Wokwi's push buttons
+#endif
+Button buttonA(4, BUTTON_INPUT);  // pin plan: button A on GPIO 4
+Button buttonB(5, BUTTON_INPUT);  // pin plan: button B on GPIO 5
 Face face;
 Dice dice;
 
@@ -133,6 +139,13 @@ void drawButtonTestScreen(uint32_t now) {
 
   canvas.setTextColor(TFT_LIGHTGREY);
   canvas.setTextSize(1);
+  if (buttonA.isTouch()) {
+    // Touch readings next to the level they must pass: handy when a touch doesn't register
+    snprintf(text, sizeof(text), "A %lu/%lu", (unsigned long)buttonA.touchValue(), (unsigned long)buttonA.touchThreshold());
+    canvas.drawString(text, 10, 206);
+    snprintf(text, sizeof(text), "B %lu/%lu", (unsigned long)buttonB.touchValue(), (unsigned long)buttonB.touchThreshold());
+    canvas.drawString(text, 125, 206);
+  }
   canvas.drawString("A kisa=ekran  A uzun=parlaklik", 10, 218);
   canvas.drawString("B kisa=eylem  cubuk=basili tutma", 10, 228);
 }
@@ -235,6 +248,10 @@ void handleSerialCommands(uint32_t now) {
         dice.forceNext(1);
         Serial.println("Test: sonraki atis 1");
         break;
+      case 'd':  // touch readings, to tune the touch buttons
+        Serial.printf("TOUCH A %lu %lu B %lu %lu\n", (unsigned long)buttonA.touchValue(), (unsigned long)buttonA.touchThreshold(),
+                      (unsigned long)buttonB.touchValue(), (unsigned long)buttonB.touchThreshold());
+        break;
     }
   }
 }
@@ -283,8 +300,12 @@ void setup() {
   }
 
   lastFrameMs = fpsWindowStartMs = millis();
+  if (buttonA.isTouch()) {
+    Serial.printf("Butonlar dokunmatik: A esigi %lu, B esigi %lu\n", (unsigned long)buttonA.touchThreshold(),
+                  (unsigned long)buttonB.touchThreshold());
+  }
   Serial.println("Merhaba PixelCharm! Ekran ve butonlar hazir.");
-  Serial.println("Serial komutlari: a/b = A/B kisa basis, t = zar adillik testi, s = ekran goruntusu, +/- = sonraki atis 20/1");
+  Serial.println("Serial komutlari: a/b = A/B kisa basis, t = zar adillik testi, s = ekran goruntusu, +/- = sonraki atis 20/1, d = dokunma degerleri");
 }
 
 void loop() {
