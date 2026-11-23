@@ -1,10 +1,11 @@
-// Tasks 1.1-1.5: colour display demo, two debounced buttons, the basic face and the d20.
+// Tasks 1.1-1.8: colour display demo, two buttons, the basic face, the d20 and pictures from flash.
 // Runs in Wokwi and, since task 1.7, on the real board (platformio.ini picks the display).
 #include <Arduino.h>
 
 #include "button.h"
 #include "dice.h"
 #include "face.h"
+#include "gallery.h"
 #include "lgfx_config.h"
 
 LGFX display;
@@ -21,15 +22,18 @@ Button buttonA(4, BUTTON_INPUT);  // pin plan: button A on GPIO 4
 Button buttonB(5, BUTTON_INPUT);  // pin plan: button B on GPIO 5
 Face face;
 Dice dice;
+Gallery gallery;
 
 // Our real screen is 240x240. Wokwi's ILI9341 is 240x320, so we only use the top 240 rows.
 constexpr int SCREEN_SIZE = 240;
 constexpr int HEADER_HEIGHT = 80;  // title, FPS and the row of shapes
 constexpr int BALL_RADIUS = 10;
 
-// A short press goes through these in order: face -> d20 -> demo -> button test -> face...
-enum class Screen { Face, Dice, Demo, ButtonTest };
+// A short press goes through these in order: face -> d20 -> each picture -> demo -> button test -> face...
+enum class Screen { Face, Dice, Image, Demo, ButtonTest };
 Screen currentScreen = Screen::Face;
+size_t imageIndex = 0;   // which picture the Image screen shows
+int loadedImage = -1;    // which picture is in the canvas right now (-1 = none)
 
 float ballX = 120, ballY = 160;
 float ballSpeedX = 90, ballSpeedY = 70;  // pixels per second
@@ -157,6 +161,11 @@ Screen nextScreen(Screen screen) {
     case Screen::Face:
       return Screen::Dice;
     case Screen::Dice:
+      imageIndex = 0;
+      return gallery.count() > 0 ? Screen::Image : Screen::Demo;
+    case Screen::Image:
+      // Next picture, or on to the demo after the last one
+      if (++imageIndex < gallery.count()) return Screen::Image;
       return Screen::Demo;
     case Screen::Demo:
       return Screen::ButtonTest;
@@ -273,8 +282,8 @@ void setup() {
   buttonA.begin();
   buttonB.begin();
   // Tells us which board we are on: the real N16R8 board should say 16 MB flash and 8 MB PSRAM
-  Serial.printf("Kart: %s, flash %lu MB, PSRAM %lu MB\n", ESP.getChipModel(), (unsigned long)(ESP.getFlashChipSize() >> 20),
-                (unsigned long)(ESP.getPsramSize() >> 20));
+  Serial.printf("Kart: %s %lu MHz, flash %lu MB, PSRAM %lu MB\n", ESP.getChipModel(), (unsigned long)getCpuFrequencyMhz(),
+                (unsigned long)(ESP.getFlashChipSize() >> 20), (unsigned long)(ESP.getPsramSize() >> 20));
 
   display.init();
   display.fillScreen(TFT_BLACK);
@@ -300,6 +309,8 @@ void setup() {
   }
 
   lastFrameMs = fpsWindowStartMs = millis();
+  gallery.begin();
+
   if (buttonA.isTouch()) {
     Serial.printf("Butonlar dokunmatik: A esigi %lu, B esigi %lu\n", (unsigned long)buttonA.touchThreshold(),
                   (unsigned long)buttonB.touchThreshold());
@@ -326,6 +337,13 @@ void loop() {
       dice.update(now);
       dice.draw(canvas);
       break;
+    case Screen::Image:
+      // A picture doesn't change: decode it only when a different one comes on screen
+      if (loadedImage != (int)imageIndex) {
+        gallery.draw(canvas, imageIndex);
+        loadedImage = imageIndex;
+      }
+      break;
     case Screen::Demo:
       moveBall(seconds);
       drawDemoScreen();
@@ -334,6 +352,8 @@ void loop() {
       drawButtonTestScreen(now);
       break;
   }
+  // Every other screen draws over the canvas, so a picture has to be decoded again next time
+  if (currentScreen != Screen::Image) loadedImage = -1;
   // ...then send the finished frame to the display in one go
   canvas.pushSprite(0, 0);
   updateFps(now);

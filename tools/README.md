@@ -14,6 +14,7 @@ They open the port without restarting the board, so the screen you are on stays 
 |---|---|
 | `dice_fairness.py` | Rolls the d20 10,000 times on the board and checks the counts with a chi-square test. `--file log.txt` reads a saved Serial Monitor log instead, `--demo` shows how the test catches a slightly unfair die. |
 | `screenshot.py` | Saves what the screen shows as a PNG, straight from the board's memory (about 10 s). |
+| `prepare_images.py` | Turns pictures in `themes-private/` into 240x240 baseline JPEGs in `firmware/data/themes/` (needs Pillow: `pip install pillow`). Then PlatformIO's "Upload Filesystem Image" copies them to the board. Both folders are git-ignored: art you don't own never goes into the repo. |
 | `device_serial.py` | Shared code: opening the port without a reset, waiting for a line. |
 
 ## Serial commands
