@@ -1,8 +1,9 @@
-// Tasks 1.1-1.3: colour display demo, two debounced buttons and the basic face.
+// Tasks 1.1-1.5: colour display demo, two debounced buttons, the basic face and the d20.
 // Runs in Wokwi and, since task 1.7, on the real board (platformio.ini picks the display).
 #include <Arduino.h>
 
 #include "button.h"
+#include "dice.h"
 #include "face.h"
 #include "lgfx_config.h"
 
@@ -13,14 +14,15 @@ LGFX_Sprite canvas(&display);
 Button buttonA(4);  // pin plan: button A on GPIO 4
 Button buttonB(5);  // pin plan: button B on GPIO 5
 Face face;
+Dice dice;
 
 // Our real screen is 240x240. Wokwi's ILI9341 is 240x320, so we only use the top 240 rows.
 constexpr int SCREEN_SIZE = 240;
 constexpr int HEADER_HEIGHT = 80;  // title, FPS and the row of shapes
 constexpr int BALL_RADIUS = 10;
 
-// A short press goes through these in order: face -> demo -> button test -> face...
-enum class Screen { Face, Demo, ButtonTest };
+// A short press goes through these in order: face -> d20 -> demo -> button test -> face...
+enum class Screen { Face, Dice, Demo, ButtonTest };
 Screen currentScreen = Screen::Face;
 
 float ballX = 120, ballY = 160;
@@ -140,6 +142,8 @@ void drawButtonTestScreen(uint32_t now) {
 Screen nextScreen(Screen screen) {
   switch (screen) {
     case Screen::Face:
+      return Screen::Dice;
+    case Screen::Dice:
       return Screen::Demo;
     case Screen::Demo:
       return Screen::ButtonTest;
@@ -152,6 +156,25 @@ void logPress(char name, ButtonEvent event, uint32_t ms) {
   Serial.printf("%c %s basis (%lu ms)\n", name, event == ButtonEvent::LongPress ? "uzun" : "kisa", (unsigned long)ms);
 }
 
+void shortPressA() {
+  countsA.shortPresses++;
+  currentScreen = nextScreen(currentScreen);
+}
+
+void longPressA() {
+  countsA.longPresses++;
+  brightness = (brightness + 1) % 4;
+  applyBrightness();
+}
+
+// Each screen's "action"
+void shortPressB(uint32_t now) {
+  countsB.shortPresses++;
+  if (currentScreen == Screen::Face) face.react(now);
+  if (currentScreen == Screen::Dice) dice.roll(now);
+  if (currentScreen == Screen::Demo) ballColor = (ballColor + 1) % 4;
+}
+
 void handleButtons(uint32_t now) {
   ButtonEvent a = buttonA.update(now);
   ButtonEvent b = buttonB.update(now);
@@ -160,12 +183,9 @@ void handleButtons(uint32_t now) {
     lastPressMs = buttonA.lastPressMs();
     logPress('A', a, lastPressMs);
     if (a == ButtonEvent::ShortPress) {
-      countsA.shortPresses++;
-      currentScreen = nextScreen(currentScreen);
+      shortPressA();
     } else {
-      countsA.longPresses++;
-      brightness = (brightness + 1) % 4;
-      applyBrightness();
+      longPressA();
     }
   }
 
@@ -173,12 +193,48 @@ void handleButtons(uint32_t now) {
     lastPressMs = buttonB.lastPressMs();
     logPress('B', b, lastPressMs);
     if (b == ButtonEvent::ShortPress) {
-      countsB.shortPresses++;
-      // Each screen's "action"
-      if (currentScreen == Screen::Face) face.react(now);
-      if (currentScreen == Screen::Demo) ballColor = (ballColor + 1) % 4;
+      shortPressB(now);
     } else {
       countsB.longPresses++;  // B's long presses get their jobs in Faz 2 and 4 (see the button map)
+    }
+  }
+}
+
+// ---------- Serial commands: test from the computer without touching the wires ----------
+
+// Sends the last frame to the computer as raw pixels (2 bytes each). tools/screenshot.py turns it into a PNG.
+// At 115200 baud the 115 KB take about 10 seconds; the screen stands still meanwhile.
+void sendScreenshot() {
+  if (canvas.getBuffer() == nullptr) return;  // no sprite, nothing to send
+  Serial.printf("SCREEN %d %d\n", (int)canvas.width(), (int)canvas.height());
+  Serial.write(static_cast<const uint8_t*>(canvas.getBuffer()), canvas.bufferLength());
+  Serial.println();
+}
+
+// Type one of these letters in the Serial Monitor and press Enter (or let a tools/ script send it)
+void handleSerialCommands(uint32_t now) {
+  while (Serial.available() > 0) {
+    switch (Serial.read()) {
+      case 'a':
+        shortPressA();
+        break;
+      case 'b':
+        shortPressB(now);
+        break;
+      case 't':
+        printFairnessTest(Serial, 10000);
+        break;
+      case 's':
+        sendScreenshot();
+        break;
+      case '+':
+        dice.forceNext(20);
+        Serial.println("Test: sonraki atis 20");
+        break;
+      case '-':
+        dice.forceNext(1);
+        Serial.println("Test: sonraki atis 1");
+        break;
     }
   }
 }
@@ -228,6 +284,7 @@ void setup() {
 
   lastFrameMs = fpsWindowStartMs = millis();
   Serial.println("Merhaba PixelCharm! Ekran ve butonlar hazir.");
+  Serial.println("Serial komutlari: a/b = A/B kisa basis, t = zar adillik testi, s = ekran goruntusu, +/- = sonraki atis 20/1");
 }
 
 void loop() {
@@ -236,12 +293,17 @@ void loop() {
   lastFrameMs = now;
 
   handleButtons(now);
+  handleSerialCommands(now);
 
   // Draw the current screen into the sprite...
   switch (currentScreen) {
     case Screen::Face:
       face.update(now, seconds);
       face.draw(canvas);
+      break;
+    case Screen::Dice:
+      dice.update(now);
+      dice.draw(canvas);
       break;
     case Screen::Demo:
       moveBall(seconds);
