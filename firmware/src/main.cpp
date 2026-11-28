@@ -1,37 +1,15 @@
-// Task 0.4: first sketch. Blinks an LED and lets a button keep it on.
+// PixelCharm firmware. Everything happens in app/app.h; the folders:
+//   app/      the states (boot, theme, menu, test), settings in NVS, the menu
+//   themes/   face, d20, pictures and GIFs, all behind one Theme interface
+//   input/    buttons (push or touch)
+//   display/  which display and how it is wired
+//   board_devkit.h  every pin in one place
 #include <Arduino.h>
 
-constexpr uint8_t LED_PIN = 2;
-constexpr uint8_t BUTTON_PIN = 4;  // Button A in the pin plan
-constexpr uint32_t BLINK_INTERVAL_MS = 500;
+#include "app/app.h"
 
-bool ledOn = false;
-bool wasPressed = false;
-uint32_t lastToggleMs = 0;
+App app;
 
-void setup() {
-  Serial.begin(115200);
-  pinMode(LED_PIN, OUTPUT);
-  // The internal pull-up keeps the pin HIGH; pressing the button connects it to GND (LOW).
-  pinMode(BUTTON_PIN, INPUT_PULLUP);
-  Serial.println("Merhaba PixelCharm!");
-}
+void setup() { app.begin(); }
 
-void loop() {
-  bool pressed = digitalRead(BUTTON_PIN) == LOW;
-
-  if (pressed != wasPressed) {
-    Serial.println(pressed ? "Butona basildi: LED surekli yanik" : "Buton birakildi: LED yanip sonuyor");
-    wasPressed = pressed;
-  }
-
-  if (pressed) {
-    ledOn = true;
-  } else if (millis() - lastToggleMs >= BLINK_INTERVAL_MS) {
-    // millis() instead of delay() so the button is still read while we wait
-    ledOn = !ledOn;
-    lastToggleMs = millis();
-  }
-
-  digitalWrite(LED_PIN, ledOn ? HIGH : LOW);
-}
+void loop() { app.loop(); }

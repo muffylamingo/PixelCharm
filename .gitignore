@@ -1,6 +1,7 @@
 # Personal planning and learning notes (kept out of the repo)
 PLAN.md
 OGRENME.md
+ogrenme_resimler/
 
 # PlatformIO
 .pio/
@@ -29,6 +30,8 @@ secrets.h
 
 # Private themes: copyrighted art stays on your own machine
 themes-private/
+# Files made from them for the board's flash (tools/prepare_images.py writes here)
+firmware/data/
 
 # Python
 __pycache__/
