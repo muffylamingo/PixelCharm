@@ -56,7 +56,7 @@ class App {
     themes_.load();
     current_ = themes_.find(settings_.themeId());
     Serial.println("Merhaba PixelCharm! Serial komutlari: a/b = A/B kisa, A = A uzun (menu), t = zar testi,");
-    Serial.println("  s = ekran goruntusu, +/- = sonraki atis 20/1, d = dokunma degerleri");
+    Serial.println("  s = ekran goruntusu, +/- = sonraki atis 20/1, d = dokunma degerleri, m = bellek");
     lastFrameMs_ = fpsWindowStartMs_ = millis();
   }
 
@@ -211,6 +211,11 @@ class App {
         case '-':
           themes_.dice().forceNext(1);
           Serial.println("Test: sonraki atis 1");
+          break;
+        case 'm':  // memory and uptime: a long test shows whether memory slowly runs out (a leak)
+          Serial.printf("MEM heap %u KB (en az %u KB), PSRAM %u KB, %lu sn\n", (unsigned)(ESP.getFreeHeap() / 1024),
+                        (unsigned)(ESP.getMinFreeHeap() / 1024), (unsigned)(ESP.getFreePsram() / 1024),
+                        (unsigned long)(millis() / 1000));
           break;
         case 'd':  // touch readings, to tune the touch buttons
           Serial.printf("TOUCH A %lu %lu B %lu %lu\n", (unsigned long)buttonA_.touchValue(),
